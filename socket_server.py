@@ -1,96 +1,80 @@
-# serve para importar a classe socket e todos os seus atributos (* = all)
-import socket
-import select
-import sys
-import Queue
+# chat_server.py
+ 
+import sys, socket, select
 
-# criar um objecto da classe socket para o servidor
-server = socket.socket()
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+HOST = '' 
+SOCKET_LIST = []
+RECV_BUFFER = 4096 
+PORT = 9009
 
-# get ip e port
-HOST = socket.gethostname()
-PORT = 12345
+def chat_server():
 
-# o servidor adapta o ip e port
-server.bind((HOST, PORT)) 
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(10)
+ 
+    # add server socket object to the list of readable connections
+    SOCKET_LIST.append(server_socket)
+ 
+    print "Chat server started on port " + str(PORT)
+ 
+    while 1:
 
-# o servidor fica a escuta de clientes com uma capacidade maxima de 5 ligacoes
-print 'Server listening...'
-server.listen(5)
+        # get the list sockets which are ready to be read through select
+        # 4th arg, time_out  = 0 : poll and never block
+        ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
+      
+        for sock in ready_to_read:
+            # a new connection request recieved
+            if sock == server_socket: 
+                sockfd, addr = server_socket.accept()
+                SOCKET_LIST.append(sockfd)
+                print "Client (%s, %s) connected" % addr
+                 
+                broadcast(server_socket, sockfd, "[%s:%s] entered our chatting room\n" % addr)
+             
+            # a message from a client, not a new connection
+            else:
+                # process data recieved from client, 
+                try:
+                    # receiving data from the socket.
+                    data = sock.recv(RECV_BUFFER)
+                    if data:
+                        # there is something in the socket
+                        broadcast(server_socket, sock, "\r" + '[' + str(sock.getpeername()) + '] ' + data)  
+                    else:
+                        # remove the socket that's broken    
+                        if sock in SOCKET_LIST:
+                            SOCKET_LIST.remove(sock)
 
-# definicao das listas de sockets para o select()
-emissor = [ server ]
-receptor = []
+                        # at this stage, no data means probably the connection has been broken
+                        broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr) 
 
-# o buffer de menssagens passadas pelas sockets emissoras
-message_queue = {}
+                # exception 
+                except:
+                    broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr)
+                    continue
 
+    server_socket.close()
+    
+# broadcast chat messages to all connected clients
+def broadcast (server_socket, sock, message):
+    for socket in SOCKET_LIST:
+        # send the message only to peer
+        if socket != server_socket and socket != sock :
+            try :
+                socket.send(message)
+            except :
+                # broken socket connection
+                socket.close()
+                # broken socket, remove it
+                if socket in SOCKET_LIST:
+                    SOCKET_LIST.remove(socket)
+ 
+if __name__ == "__main__":
 
-while emissor:
-	# Wait for at least one of the sockets to be ready for processing
-	print >>sys.stderr, '\nwaiting for the next event'
-	readable, writable, exceptional = select.select(emissor, receptor, emissor)
-
-	# Handle inputs
-	for s in readable:
-		if s is server:
-		    # A "readable" server socket is ready to accept a connection
-		    connection, client_address = s.accept()
-		    print >>sys.stderr, 'new connection from', client_address
-		    connection.setblocking(0)
-		    emissor.append(connection)
-
-		    # Give the connection a queue for data we want to send
-		    message_queue[connection] = Queue.Queue()
-		
-		else:
-			data = s.recv(1024)
-			if data:
-				# A readable client socket has data
-				print >>sys.stderr, 'received "%s" from %s' % (data, s.getpeername())
-				message_queue[s].put(data)
-				# Add output channel for response
-				if s not in receptor:
-				    receptor.append(s)
-		
-			else:
-				# Interpret empty result as closed connection
-				print >>sys.stderr, 'closing', client_address, 'after reading no data'
-				# Stop listening for input on the connection
-				if s in receptor:
-				    receptor.remove(s)
-				emissor.remove(s)
-				s.close()
-				print 'closed a client'
-
-				# Remove message queue
-				del message_queue[s]
+    sys.exit(chat_server())
 
 
-	# Handle outputs
-	for s in writable:
-		try:
-		    next_msg = message_queue[s].get_nowait()
-		except Queue.Empty:
-		    # No messages waiting so stop checking for writability.
-		    print >>sys.stderr, 'output queue for', s.getpeername(), 'is empty'
-		    receptor.remove(s)
-		else:
-		    print >>sys.stderr, 'sending "%s" to %s' % (next_msg, s.getpeername())
-		    s.send(next_msg)
-		    
-
-	# Handle "exceptional conditions"
-	for s in exceptional:
-		print >>sys.stderr, 'handling exceptional condition for', s.getpeername()
-		# Stop listening for input on the connection
-		emissor.remove(s)
-		if s in receptor:
-			receptor.remove(s)
-		s.close()
-		print 'closed a client'
-
-		# Remove message queue
-		del message_queue[s]
-
+         
