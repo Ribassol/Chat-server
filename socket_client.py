@@ -1,47 +1,53 @@
-import socket
-import sys
-import time
+# chat_client.py
 
-messages = [ 'This is the message. ',
-			 'It will be sent ',
-			 'in parts.',
-			 ]
+import sys, socket, select
+ 
+def chat_client():
+    if(len(sys.argv) < 3) :
+        print 'Usage : python chat_client.py hostname port'
+        sys.exit()
 
-# get ip e port
-HOST = socket.gethostname()
-PORT = 12345
+    host = sys.argv[1]
+    port = int(sys.argv[2])
+     
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(2)
+     
+    # connect to remote host
+    try :
+        s.connect((host, port))
+    except :
+        print 'Unable to connect'
+        sys.exit()
+     
+    print 'Connected to remote host. You can start sending messages'
+    sys.stdout.write('[Me] '); sys.stdout.flush()
+     
+    while 1:
+        socket_list = [sys.stdin, s]
+         
+        # Get the list sockets which are readable
+        read_sockets, write_sockets, error_sockets = select.select(socket_list , [], [])
+         
+        for sock in read_sockets:            
+            if sock == s:
+                # incoming message from remote server, s
+                data = sock.recv(4096)
+                if not data :
+                    print '\nDisconnected from chat server'
+                    sys.exit()
+                else :
+                    #print data
+                    sys.stdout.write(data)
+                    sys.stdout.write('[Me] '); sys.stdout.flush()     
+            
+            else :
+                # user entered a message
+                msg = sys.stdin.readline()
+                s.send(msg)
+                sys.stdout.write('[Me] '); sys.stdout.flush() 
 
-server_address = (HOST, PORT)
+if __name__ == "__main__":
 
-# Create a TCP/IP socket
-socks = [ socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-		  socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-		  ]
+    sys.exit(chat_client())
 
-# Connect the socket to the port where the server is listening
-print '\n\n'
-print >>sys.stderr, 'connecting to %s port %s' % server_address
-print '\n'
-for s in socks:
-	s.connect(server_address)
-	print 'connected socket %s to server' %s
-print '\n'
-
-for message in messages:
-
-	# Send messages on both sockets
-	for s in socks:
-		print >>sys.stderr, '%s: sending "%s"' % (s.getsockname(), message)
-		print '\n'
-		s.send(message)
-
-	# Read responses on both sockets
-	for s in socks:
-		data = s.recv(1024)
-		print >>sys.stderr, '%s: received "%s"' % (s.getsockname(), data)
-		print '\n'
-
-		if not data:
-		    print >>sys.stderr, 'closing socket', s.getsockname()
-		    s.close()
-print '\n\n'
