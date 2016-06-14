@@ -6,9 +6,25 @@ HOST = ''
 SOCKET_LIST = []
 RECV_BUFFER = 4096 
 PORT = 9009
+CLIENT_LIST = []
+client_count=0
+
+# Client class to store the users' important infos
+class Client:
+	def __init__(self,username,socket_tag,address):
+		self.username=username
+		self.socket_tag=socket_tag
+		self.address=address
+
+# Method to add new users to the client list
+def newClient(conn,address):
+	global client_count
+	client_count += 1
+	newCL = Client('User_'+str(client_count),conn,address)
+	CLIENT_LIST.append(newCL)
+	return newCL
 
 def chat_server():
-
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((HOST, PORT))
@@ -16,22 +32,26 @@ def chat_server():
  
     # add server socket object to the list of readable connections
     SOCKET_LIST.append(server_socket)
- 
+	
     print "Chat server started on port " + str(PORT)
- 
+	
     while 1:
-
+		
         # get the list sockets which are ready to be read through select
         # 4th arg, time_out  = 0 : poll and never block
         ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
       
         for sock in ready_to_read:
             # a new connection request recieved
-            if sock == server_socket: 
+            if sock == server_socket:
                 sockfd, addr = server_socket.accept()
                 SOCKET_LIST.append(sockfd)
-                print "Client (%s, %s) connected" % addr
-                 
+                newCL=newClient(sockfd,addr)
+                """
+                for i in CLIENT_LIST:
+                	print i
+				"""
+                print "%s connected" % newCL.username               
                 broadcast(server_socket, sockfd, "[%s:%s] entered our chatting room\n" % addr)
              
             # a message from a client, not a new connection
@@ -47,7 +67,11 @@ def chat_server():
                         # remove the socket that's broken    
                         if sock in SOCKET_LIST:
                             SOCKET_LIST.remove(sock)
-
+                            
+                        """for client in CLIENT_LIST:
+                        	if sock == CLIENT_LIST[client].socket_tag
+                        		CLIENT_LIST.remove(CLIENT_LIST[client])
+						"""
                         # at this stage, no data means probably the connection has been broken
                         broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr) 
 
