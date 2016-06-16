@@ -32,11 +32,9 @@ def chat_server():
  
     # add server socket object to the list of readable connections
     SOCKET_LIST.append(server_socket)
-	
     print "Chat server started on port " + str(PORT)
 	
     while 1:
-		
         # get the list sockets which are ready to be read through select
         # 4th arg, time_out  = 0 : poll and never block
         ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
@@ -47,10 +45,15 @@ def chat_server():
                 sockfd, addr = server_socket.accept()
                 SOCKET_LIST.append(sockfd)
                 newCL=newClient(sockfd,addr)
-                """
+				
+				###########################
                 for i in CLIENT_LIST:
+                	print vars(i)
+                	print'\n'
                 	print i
-				"""
+                	print "\n"
+                ###########################
+                
                 print "%s connected" % newCL.username               
                 broadcast(server_socket, sockfd, "[%s:%s] entered our chatting room\n" % addr)
              
@@ -67,11 +70,12 @@ def chat_server():
                         # remove the socket that's broken    
                         if sock in SOCKET_LIST:
                             SOCKET_LIST.remove(sock)
-                            
-                        """for client in CLIENT_LIST:
-                        	if sock == CLIENT_LIST[client].socket_tag
-                        		CLIENT_LIST.remove(CLIENT_LIST[client])
-						"""
+                        
+                        # also remove the respective client
+                        for clt in CLIENT_LIST:
+                        	if clt.socket_tag == sock:
+                        		CLIENT_LIST.remove(clt)
+						
                         # at this stage, no data means probably the connection has been broken
                         broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr) 
 
