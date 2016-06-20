@@ -19,7 +19,9 @@ def chat_client():
     except :
         print 'Unable to connect'
         sys.exit()
-     
+    
+    
+    
     print 'Connected to remote host. You can start sending messages'
     sys.stdout.write('[Me] '); sys.stdout.flush()
      
