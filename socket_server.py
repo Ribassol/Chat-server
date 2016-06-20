@@ -43,6 +43,9 @@ def chat_server():
 			# a new connection request recieved
 			if sock == server_socket:
 				sockfd, addr = server_socket.accept()
+				
+				sockfd.send("Username and password:")
+				
 				SOCKET_LIST.append(sockfd)
 				newCL=newClient(sockfd,addr)
 				print "%s connected" % newCL.username               
@@ -84,6 +87,7 @@ def chat_server():
 					print "%s disconnected" % username
 					broadcast(server_socket, sock, "%s is offline\n" % username)
 					continue
+
 
 	server_socket.close()
     
